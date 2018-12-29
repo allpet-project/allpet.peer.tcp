@@ -6,7 +6,7 @@ namespace allpet.peer.tcp
 {
     public class PeerV1
     {
-        IPeer CreatePeer()
+        public static IPeer CreatePeer()
         {
             return new Network();
         }

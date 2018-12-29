@@ -5,4 +5,9 @@
     <TargetFramework>netcoreapp2.2</TargetFramework>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Interface\allpet.Peer.Tcp.Interface.csproj" />
+    <ProjectReference Include="..\PeerV1\allpet.Peer.Tcp.PeerV1.csproj" />
+  </ItemGroup>
+
 </Project>
