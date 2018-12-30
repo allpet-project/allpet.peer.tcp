@@ -125,8 +125,9 @@ namespace allpet.peer.tcp
 
 
 
-        public void Connect(IPEndPoint linktoEndPoint)
+        public UInt64 Connect(IPEndPoint linktoEndPoint)
         {
+            return 0;
 
         }
 

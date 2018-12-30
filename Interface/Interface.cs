@@ -23,14 +23,17 @@ namespace allpet.peer.tcp
         void Listen(IPEndPoint endpoint);
         //结束监听
         void StopListen();
+
+        //发起连接
         //一个Peer可以发起多个连接
-        void Connect(IPEndPoint linktoEndPoint);
+        //发起连接可立即得到一个linkid
+        UInt64 Connect(IPEndPoint linktoEndPoint);
 
         //无论是accept 的 和 connect的,统一管理 用一个UINT64标识他
 
         event Action<UInt64, IPEndPoint> OnAccepted;//Listen->When Connect In->OnAccepted(linkid,remoteEndPoint);
         event Action<UInt64> OnConnected;//Connect->When Linked->OnConnected(linkid);
-        //连接发生错误时处罚
+        //连接发生错误时触发
         event Action<UInt64, Exception> OnLinkError;
         event Action<UInt64, byte[]> OnRecv;
         event Action<UInt64> OnCloseed;//When Closed->OnCloseed(linkid);
