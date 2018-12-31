@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading;
 
 namespace light.asynctcp
 {
@@ -104,8 +101,7 @@ namespace light.asynctcp
             if (e.BytesTransferred == 0)
             {
                 //接收0转过去的,这个e不给他回收
-                CloseLink(link);
-                //ProcessDisConnect(null, link);
+                ProcessRecvZero(link);
                 return;
             }
             byte[] data = new byte[e.BytesTransferred];
@@ -130,19 +126,28 @@ namespace light.asynctcp
         {
 
         }
-        void CloseLink(LinkInfo link)
+        private void ProcessDisConnect(SocketAsyncEventArgs e, LinkInfo link)
+        {//收到这个是主动断线一方
+            try
+            {
+                link.Socket.Close();
+                link.Socket = null;
+            }
+            catch(Exception err)
+            {
+
+            }
+            PushBackEventArgs(e);
+        }
+        /// <summary>
+        /// 收到零个字节代表这个连接被断开了
+        /// </summary>
+        /// <param name="link"></param>
+        private void ProcessRecvZero(LinkInfo link)
         {
+            this.links.TryRemove(link.Handle, out LinkInfo v);
+
             this.OnClosed(link.Handle);
         }
-        //private void ProcessDisConnect(SocketAsyncEventArgs e, LinkInfo link)
-        //{
-        //    this.OnClosed(link.Handle);
-        //    if (e != null)
-        //    {
-        //        PushBackEventArgs(e);
-        //    }
-        //}
-
-
     }
 }

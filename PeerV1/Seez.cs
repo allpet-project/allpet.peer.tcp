@@ -140,7 +140,7 @@ namespace allpet.peer.tcp
         {
         }
 
-        public void CloseLink(ulong linkid)
+        public void Disconnect(ulong linkid)
         {
             //var link = linkList[linkid];
             //CloseLink(link);

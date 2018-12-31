@@ -77,8 +77,8 @@ namespace peer.test
             peer1.OnRecv += (id, msg) =>
              {
                  Console.WriteLine("peer1::OnRecv");
-                 peer1.Send(id, new byte[] { 05, 00, 3, 1, 2, 3, 4 });
-
+                 //peer1.Send(id, new byte[] { 05, 00, 3, 1, 2, 3, 4 });
+                 peer1.Disconnect(id);
              };
             peer1.Listen(endpoint);
 
@@ -105,7 +105,7 @@ namespace peer.test
             {
                 Console.WriteLine("peer2::OnRecv");
 
-                peer1.CloseLink(peer1linkid);
+                //peer1.CloseLink(peer1linkid);
 
             };
             var linkid = peer2.Connect(new System.Net.IPEndPoint(linkip, 8888));

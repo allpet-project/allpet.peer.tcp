@@ -140,7 +140,8 @@ namespace light.asynctcp
         {
             try
             {
-                logger.Log("got complete state:" + e.LastOperation);
+                logger.Log("got complete state:" + e.LastOperation + "|" + e.SocketError);
+
                 switch (e.LastOperation)
                 {
                     case SocketAsyncOperation.Accept:
@@ -149,14 +150,20 @@ namespace light.asynctcp
                     case SocketAsyncOperation.Connect:
                         ProcessConnect(e, e.UserToken as LinkInfo);
                         break;
-                    //不需要处理这个情况
-                    //case SocketAsyncOperation.Disconnect:
-                    //    {
-                    //        ProcessDisConnect(e, e.UserToken as LinkInfo);
-                    //    }
-                    //    break;
+                    case SocketAsyncOperation.Disconnect:
+                        ProcessDisConnect(e, e.UserToken as LinkInfo);
+                        break;
                     case SocketAsyncOperation.Receive:
-                        ProcessReceice(e, e.UserToken as LinkInfo);
+                        {
+                            if (e.SocketError != SocketError.Success)
+                            {
+                                throw new Exception("what the fuck.");
+                            }
+                            else
+                            {
+                                ProcessReceice(e, e.UserToken as LinkInfo);
+                            }
+                        }
                         break;
                     case SocketAsyncOperation.Send:
                         ProcessSend(e, e.UserToken as LinkInfo);
@@ -230,14 +237,14 @@ namespace light.asynctcp
             }
         }
 
-        public void CloseLink(ulong linkid)
+        public void Disconnect(ulong linkid)
         {
             var link = this.links[linkid];
             try
             {
                 var e = GetFreeEventArgs();
                 e.UserToken = link;
-                //var b = link.Socket.DisconnectAsync(e);
+                var b = link.Socket.DisconnectAsync(e);
                 //if (!b)
                 //{
                 //    ProcessDisConnect(e, link);
@@ -251,9 +258,8 @@ namespace light.asynctcp
             }
             finally
             {
-                link.Socket.Close();
-                link.Socket = null;
-                this.links.TryRemove(link.Handle, out LinkInfo v);
+                //link.Socket.Close();
+                //link.Socket = null;
             }
         }
     }

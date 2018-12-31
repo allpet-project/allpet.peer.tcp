@@ -43,7 +43,7 @@ namespace allpet.peer.tcp
         event Action<UInt64> OnClosed;//When Closed->OnCloseed(linkid);
 
         void Send(UInt64 link, byte[] data);
-        void CloseLink(UInt64 linkid);
+        void Disconnect(UInt64 linkid);
     }
 
 
