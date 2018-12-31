@@ -14,6 +14,10 @@ namespace allpet.peer.tcp
     public interface IPeer : IDisposable
     // 继承IDisposable 明确表示此类型含有非托管资源，需妥善释放
     {
+        UInt64 ID
+        {
+            get;
+        }
         //初始化Peer模块用
         void Start(PeerOption option);
         //结束Peer模块用，Dispose也调用Close，Close多次调用不应崩溃
@@ -36,7 +40,7 @@ namespace allpet.peer.tcp
         //连接发生错误时触发
         event Action<UInt64, Exception> OnLinkError;
         event Action<UInt64, byte[]> OnRecv;
-        event Action<UInt64> OnCloseed;//When Closed->OnCloseed(linkid);
+        event Action<UInt64> OnClosed;//When Closed->OnCloseed(linkid);
 
         void Send(UInt64 link, byte[] data);
         void CloseLink(UInt64 linkid);

@@ -6,16 +6,16 @@ using System.Threading;
 
 namespace light.asynctcp
 {
-    public partial class ServerModule
+    partial class ServerModule
     {
-        Semaphore _maxAcceptedClients;//用信号量控制最大连接数
+        //Semaphore _maxAcceptedClients;//用信号量控制最大连接数
         System.Collections.Concurrent.ConcurrentDictionary<UInt64, LinkInfo> links;
 
         void InitProcess()
         {
-            int _maxClient = 10000;
+            //int _maxClient = 10000;
             links = new System.Collections.Concurrent.ConcurrentDictionary<UInt64, LinkInfo>();
-            _maxAcceptedClients = new Semaphore(_maxClient, _maxClient);
+            //_maxAcceptedClients = new Semaphore(_maxClient, _maxClient);
 
         }
         /// <summary>  
@@ -44,17 +44,22 @@ namespace light.asynctcp
                         link.ConnectDateTime = DateTime.Now;
                         link.recvArgs = GetFreeEventArgs();
                         link.sendArgs = GetFreeEventArgs();
-
+                        link.recvArgs.UserToken = link;
+                        link.sendArgs.UserToken = link;
                         this.links.TryAdd((UInt64)link.Handle, link);
 
                         //s.Send(Encoding.UTF8.GetBytes("Your GUID:" + token.ID));
 
                         Console.WriteLine("client in:" + this.links.Count);
 
-                        //if (!s.ReceiveAsync(asyniar))//投递接收请求  
-                        //{
-                        //    ProcessReceive(asyniar);
-                        //}
+                        this.OnAccepted(link.Handle, link.Socket.RemoteEndPoint as System.Net.IPEndPoint);
+
+                        link.recvArgs.SetBuffer(new byte[1024], 0, 1024);
+                        var asyncr = link.Socket.ReceiveAsync(link.recvArgs);
+                        if (!asyncr)
+                        {
+                            ProcessReceice(link.recvArgs, link);
+                        }
                     }
                     catch (SocketException ex)
                     {
@@ -62,52 +67,82 @@ namespace light.asynctcp
                         Console.WriteLine(String.Format("接收客户 {0} 数据出错, 异常信息： {1} 。", s.RemoteEndPoint, ex.ToString()));
                         //TODO 异常处理  
                     }
-                    //投递下一个接受请求  
+                    //投递下一个接受请求,這裏就直接復用了
                     StartAccept(e);
                 }
             }
             else
             {
-                CloseClientSocket(e); ;
+                throw new Exception("accept error.");
+                //ProcessDisConnect(e, e.UserToken as LinkInfo);
             }
         }
 
-
-        public void CloseClientSocket(SocketAsyncEventArgs e)
+        private void ProcessConnect(SocketAsyncEventArgs e, LinkInfo link)
         {
-            LinkInfo token = (LinkInfo)e.UserToken;
-            if (token == null)
+            link.recvArgs = GetFreeEventArgs();
+            link.sendArgs = GetFreeEventArgs();
+            link.recvArgs.UserToken = link;
+            link.sendArgs.UserToken = link;
+
+            this.OnConnected(link.Handle);
+
+            link.recvArgs.SetBuffer(new byte[1024], 0, 1024);
+            var asyncr = link.Socket.ReceiveAsync(link.recvArgs);
+            if (!asyncr)
             {
-                e.AcceptSocket.Close();
-                _maxAcceptedClients.Release();//释放线程信号量
+                ProcessReceice(link.recvArgs, link);
+            }
+
+            //復用一個connect args
+            e.UserToken = null;
+            this.PushBackEventArgs(e);
+        }
+        private unsafe void ProcessReceice(SocketAsyncEventArgs e, LinkInfo link)
+        {
+            var pi = e.ReceiveMessageFromPacketInfo;
+            if (e.BytesTransferred == 0)
+            {
+                //接收0转过去的,这个e不给他回收
+                CloseLink(link);
+                //ProcessDisConnect(null, link);
                 return;
             }
+            byte[] data = new byte[e.BytesTransferred];
 
-            if (e.SocketError == SocketError.OperationAborted || e.SocketError == SocketError.ConnectionAborted)
-                return;
+            fixed (byte* a = e.Buffer)
+            {
+                fixed (byte* dest = data)
+                {
+                    System.Buffer.MemoryCopy(a, dest, e.BytesTransferred, e.BytesTransferred);
+                }
+            }
+            this.OnRecv(link.Handle, data);
 
-            Console.WriteLine(String.Format("客户 {0} 断开连接!", token.Socket.RemoteEndPoint.ToString()));
-
-            Socket s = token.Socket;
-            try
+            var asyncr = link.Socket.ReceiveAsync(link.recvArgs);
+            if (!asyncr)
             {
-                s.Shutdown(SocketShutdown.Both);
+                ProcessReceice(e, link);
             }
-            catch (Exception ex)
-            {
-                // Throw if client has closed, so it is not necessary to catch.
-                //Log4Debug(ex.StackTrace);
-            }
-            finally
-            {
-                s.Close();
-                s = null;
-            }
-            _maxAcceptedClients.Release();//释放线程信号量
-            PushBackEventArgs(e);//SocketAsyncEventArg 对象被释放，压入可重用队列。
-            links.TryRemove((UInt64)token.Handle, out LinkInfo info);//去除正在连接的用户
 
         }
+        private void ProcessSend(SocketAsyncEventArgs e, LinkInfo link)
+        {
+
+        }
+        void CloseLink(LinkInfo link)
+        {
+            this.OnClosed(link.Handle);
+        }
+        //private void ProcessDisConnect(SocketAsyncEventArgs e, LinkInfo link)
+        //{
+        //    this.OnClosed(link.Handle);
+        //    if (e != null)
+        //    {
+        //        PushBackEventArgs(e);
+        //    }
+        //}
+
 
     }
 }

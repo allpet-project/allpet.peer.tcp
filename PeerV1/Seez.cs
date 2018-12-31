@@ -9,6 +9,11 @@ namespace allpet.peer.tcp
 {
     class Network : allpet.peer.tcp.IPeer
     {
+        public UInt64 ID
+        {
+            get;
+            private set;
+        }
         private Socket listener;
         public EndPoint listenEndpoint;
         //private Semaphore semaphoreAcceptedClients;
@@ -18,7 +23,7 @@ namespace allpet.peer.tcp
         public event Action<ulong> OnConnected;
         public event Action<ulong, Exception> OnLinkError;
         public event Action<ulong, byte[]> OnRecv;
-        public event Action<ulong> OnCloseed;
+        public event Action<ulong> OnClosed;
 
         private List<Link> linkList = new List<Link>();
 

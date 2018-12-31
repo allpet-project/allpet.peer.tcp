@@ -5,15 +5,15 @@ using System.Text;
 
 namespace light.asynctcp
 {
-    public partial class ServerModule
+     partial class ServerModule
     {
         void InitEventArgsPool(int capacity = 1000)
         {
             poolEventArgs = new System.Collections.Concurrent.ConcurrentStack<SocketAsyncEventArgs>();
-            for (var i = 0; i < capacity; i++)
-            {
-                poolEventArgs.Push(new SocketAsyncEventArgs());
-            }
+            //for (var i = 0; i < capacity; i++)
+            //{
+            //    poolEventArgs.Push(new SocketAsyncEventArgs());
+            //}
         }
         /// <summary>
         /// SocketAsyncEventArgs 池
@@ -36,7 +36,7 @@ namespace light.asynctcp
             if (!b)
             {
                 args = new SocketAsyncEventArgs();
-                args.Completed += OnAcceptCompleted;
+                args.Completed += OnCompleted;
             }
             return args;
         }
