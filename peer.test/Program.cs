@@ -79,13 +79,13 @@ namespace peer.test
             peer1.OnRecv += (id, msg) =>
              {
                  recvsize += (ulong)msg.Length;
-                 if (recvsize % (1024 * 1024) == 0)
-                 {
-                     Console.WriteLine("peer1::OnRecv " + recvsize);
-                 }
+                 //if (recvsize % (1024 * 1024) == 0)
+                 //{
+                 //    Console.WriteLine("peer1::OnRecv " + recvsize);
+                 //}
                  //peer1.Send(id, new byte[] { 05, 00, 3, 1, 2, 3, 4 });
                  //peer1.Disconnect(id);
-                 if(recvsize/(1024*1024)==100)
+                 if (recvsize / (1024 * 1024) == 100)
                  {
                      var total = (DateTime.Now - time).TotalSeconds;
                      Console.WriteLine("total time=" + total);
@@ -101,9 +101,9 @@ namespace peer.test
             {
                 Console.WriteLine("peer2::OnConnected");
 
-                for (var i = 0; i < 10* 1024; i++)
+                for (var i = 0; i < 10 * 1024; i++)
                 {
-                    var bytes = new byte[10* 1024];
+                    var bytes = new byte[10 * 1024];
                     peer2.Send(id, bytes);
                 }
 

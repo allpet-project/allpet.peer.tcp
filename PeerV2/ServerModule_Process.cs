@@ -31,7 +31,7 @@ namespace light.asynctcp
                     {
 
                         SocketAsyncEventArgs asyniar = GetFreeEventArgs();
-                        var link = new LinkInfo();
+                        var link = GetFreeLink();
                         link.type = LinkType.AcceptedLink;
                         asyniar.UserToken = link;
 
@@ -40,10 +40,6 @@ namespace light.asynctcp
                         link.Handle = (UInt64)s.Handle.ToInt64();
                         //token.ID = System.Guid.NewGuid().ToString();
                         link.ConnectDateTime = DateTime.Now;
-                        link.recvArgs = GetFreeEventArgs();
-                        link.sendArgs = GetFreeEventArgs();
-                        link.recvArgs.UserToken = link;
-                        link.sendArgs.UserToken = link;
                         link.sendTag = 0;
                         this.links.TryAdd((UInt64)link.Handle, link);
 
@@ -53,7 +49,6 @@ namespace light.asynctcp
 
                         this.OnAccepted(link.Handle, link.Socket.RemoteEndPoint as System.Net.IPEndPoint);
 
-                        link.recvArgs.SetBuffer(new byte[1024], 0, 1024);
                         var asyncr = link.Socket.ReceiveAsync(link.recvArgs);
                         if (!asyncr)
                         {
@@ -86,14 +81,8 @@ namespace light.asynctcp
 
         private void ProcessConnect(SocketAsyncEventArgs e, LinkInfo link)
         {
-            link.recvArgs = GetFreeEventArgs();
-            link.sendArgs = GetFreeEventArgs();
-            link.recvArgs.UserToken = link;
-            link.sendArgs.UserToken = link;
-
             this.OnConnected(link.Handle);
 
-            link.recvArgs.SetBuffer(new byte[1024], 0, 1024);
             var asyncr = link.Socket.ReceiveAsync(link.recvArgs);
             if (!asyncr)
             {
@@ -119,12 +108,9 @@ namespace light.asynctcp
             }
             byte[] data = new byte[e.BytesTransferred];
 
-            fixed (byte* a = e.Buffer)
+            fixed (byte* src = e.Buffer, dest = data)
             {
-                fixed (byte* dest = data)
-                {
-                    System.Buffer.MemoryCopy(a, dest, e.BytesTransferred, e.BytesTransferred);
-                }
+                System.Buffer.MemoryCopy(src, dest, e.BytesTransferred, e.BytesTransferred);
             }
             this.OnRecv(link.Handle, data);
 
@@ -132,42 +118,72 @@ namespace light.asynctcp
             return asyncr;
         }
 
-        private void Send(LinkInfo link, byte[] data)
+        private unsafe void SendOnce(LinkInfo link, ArraySegment<byte> data)
         {
-            bool basync = false;
+            if (data.Count > _SendBufferSize)
+                throw new Exception("1buf for once send");
+
             lock (link)
             {
+                //check if queue
+                if (link.queueSend == null)
+                    link.queueSend = new System.Collections.Generic.Queue<ArraySegment<byte>>();
+
                 if (link.sendTag == 1)
                 {
-                    if (link.queueSend == null)
-                        link.queueSend = new System.Collections.Generic.Queue<ArraySegment<byte>>();
-                    link.queueSend.Enqueue(new ArraySegment<byte>(data));
+                    link.queueSend.Enqueue(data);
                     return;
                 }
-                link.sendArgs.SendPacketsSendSize = data.Length;
-                link.sendArgs.SendPacketsFlags = TransmitFileOptions.UseSystemThread;
-                link.sendArgs.SetBuffer(data, 0, data.Length);
-                basync = link.Socket.SendAsync(link.sendArgs);
+
+                //senddata
+                //link.sendArgs.SendPacketsSendSize = oncedata.Count;
+                //修改发出尺寸
+                if (link.sendArgs.Count != data.Count)
+                    link.sendArgs.SetBuffer(link.sendArgs.Offset, data.Count);
+                fixed (byte* src = data.Array, dest = link.sendArgs.Buffer)
+                {
+                    Buffer.MemoryCopy(src + data.Offset,
+                        dest + link.sendArgs.Offset,
+                        link.sendArgs.Buffer.Length,
+                        data.Count);
+                }
+                bool basync = link.Socket.SendAsync(link.sendArgs);
                 if (basync)//操作没有立即完成，标记
                     link.sendTag = 1;
+                //从逻辑上讲sendonce 要么处于sendTag=1，进队列，要么处于 第一笔交易 ，只需标记
+                //CheckSendQueue(link, basync);
             }
-            if (!basync)
+        }
+        private unsafe void CheckSendQueue(LinkInfo link, bool basync = false)
+        {
+
+            //check if have more data to send
+            while (!basync && (link.queueSend != null && link.queueSend.Count > 0))
             {
-                ProcessSend(link.sendArgs, link);
+                var oncedata = link.queueSend.Dequeue();
+                //link.sendArgs.SendPacketsSendSize = oncedata.Count;
+                //修改发出尺寸
+                if (link.sendArgs.Count != oncedata.Count)
+                    link.sendArgs.SetBuffer(link.sendArgs.Offset, oncedata.Count);
+                fixed (byte* src = oncedata.Array, dest = link.sendArgs.Buffer)
+                {
+                    Buffer.MemoryCopy(src + oncedata.Offset,
+                        dest + link.sendArgs.Offset,
+                        _SendBufferSize,
+                        oncedata.Count);
+                }
+                basync = link.Socket.SendAsync(link.sendArgs);
             }
+            if (basync)//操作没有立即完成，标记
+                link.sendTag = 1;
         }
         private void ProcessSend(SocketAsyncEventArgs e, LinkInfo link)
         {
             lock (link)
             {
                 link.sendTag = 0;
-                if (link.queueSend != null && link.queueSend.Count > 0)
-                {
-                    var data = link.queueSend.Dequeue();
-                    Send(link, data.Array);
-                }
+                CheckSendQueue(link);
             }
-
         }
         private void ProcessDisConnect(SocketAsyncEventArgs e, LinkInfo link)
         {//收到这个是主动断线一方
@@ -188,6 +204,7 @@ namespace light.asynctcp
         /// <param name="link"></param>
         private void ProcessRecvZero(LinkInfo link)
         {
+            this.PushBackLinks(link);
             this.links.TryRemove(link.Handle, out LinkInfo v);
 
             this.OnClosed(link.Handle);

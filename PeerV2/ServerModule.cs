@@ -60,7 +60,7 @@ namespace light.asynctcp
             logger.Log("Module Start==");
 
             int capacity = 1000;
-            InitEventArgsPool(capacity);
+            InitPools(capacity);
             InitProcess();
 
             logger.Log("==Module Start");
@@ -140,7 +140,7 @@ namespace light.asynctcp
         {
             try
             {
-                logger.Log("got complete state:" + e.LastOperation + "|" + e.SocketError);
+                //logger.Log("got complete state:" + e.LastOperation + "|" + e.SocketError);
 
                 switch (e.LastOperation)
                 {
@@ -215,12 +215,13 @@ namespace light.asynctcp
                 throw new Exception("need set event OnRecv");
             }
             var eventArgs = GetFreeEventArgs();
-            LinkInfo link = new LinkInfo();
+            LinkInfo link = GetFreeLink();
             eventArgs.UserToken = link;
             link.type = LinkType.ConnectedLink;
             link.Socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             link.Handle = (UInt64)link.Socket.Handle;
             link.sendTag = 0;
+            link.ConnectDateTime = DateTime.Now;
             eventArgs.RemoteEndPoint = linktoEndPoint;
             if (!link.Socket.ConnectAsync(eventArgs))
             {
@@ -232,10 +233,26 @@ namespace light.asynctcp
 
         public void Send(ulong linkid, byte[] data)
         {
-
             var link = this.links[linkid];
-            Send(link, data);
+            var oncecount = _SendBufferSize;
 
+            var last = data.Length % oncecount;
+            var splitcount = data.Length / oncecount;
+            for (var i = 0; i < splitcount; i++)
+            {
+                SendOnce(link, new ArraySegment<byte>(data, i * oncecount, oncecount));
+            }
+            if (last != 0)
+                SendOnce(link, new ArraySegment<byte>(data, splitcount * oncecount, last));
+        }
+        public void SendPacket(ulong linkid, byte[] data)
+        {
+            if (data.Length > 0xffff)
+            {
+                throw new Exception(" do not allow msg packet big than 0xffff.");
+            }
+            Send(linkid, BitConverter.GetBytes((UInt16)data.Length));
+            Send(linkid, data);
         }
 
         public void Disconnect(ulong linkid)
