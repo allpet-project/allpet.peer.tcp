@@ -36,6 +36,11 @@ namespace peer.test
                     InitV2();
                     Listen();
                 }
+                else if (line == "lv2")
+                {
+                    InitV2();
+                    Listen10K();
+                }
             }
         }
         static void InitV1()
@@ -56,6 +61,7 @@ namespace peer.test
             Console.WriteLine("init peer1=" + peer1.ID);
             Console.WriteLine("init peer2=" + peer2.ID);
         }
+        //测试一个链接
         static void Listen()
         {
             DateTime time = DateTime.Now;
@@ -79,10 +85,10 @@ namespace peer.test
             peer1.OnRecv += (id, msg) =>
              {
                  recvsize += (ulong)msg.Length;
-                 //if (recvsize % (1024 * 1024) == 0)
-                 //{
-                 //    Console.WriteLine("peer1::OnRecv " + recvsize);
-                 //}
+                 if (recvsize % (1024 * 1024) == 0)
+                 {
+                     Console.WriteLine("peer1::OnRecv " + recvsize);
+                 }
                  //peer1.Send(id, new byte[] { 05, 00, 3, 1, 2, 3, 4 });
                  //peer1.Disconnect(id);
                  if (recvsize / (1024 * 1024) == 100)
@@ -125,6 +131,74 @@ namespace peer.test
             };
             var linkid = peer2.Connect(new System.Net.IPEndPoint(linkip, 8888));
             peer2linkid = linkid;
+        }
+
+        static void Listen10K()
+        {
+            DateTime time = DateTime.Now;
+            var endpoint = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 8888);
+            int acceptcount = 0;
+            peer1.OnAccepted += (id, remote) =>
+            {
+                acceptcount++;
+                if (acceptcount % 100 == 0)
+                {
+                    Console.WriteLine("peer1::OnAccepted " + acceptcount);
+
+                }
+            };
+            peer1.OnClosed += (id) =>
+            {
+                acceptcount--;
+                if (acceptcount % 100 == 0)
+                {
+                    Console.WriteLine("peer1::OnClosed " + acceptcount);
+
+                }
+            };
+            peer1.OnLinkError += (id, err) =>
+            {
+                //acceptcount--;
+                if (acceptcount % 100 == 0)
+                {
+                    Console.WriteLine("peer1::OnLinkError " + acceptcount);
+                }
+            };
+            peer1.OnRecv += (id, msg) =>
+            {
+
+
+            };
+            peer1.Listen(endpoint);
+
+
+
+
+            var linkip = System.Net.IPAddress.Parse("127.0.0.1");
+
+            peer2.OnConnected += (id) =>
+            {
+                var bytes = new byte[12];
+                peer2.Send(id, bytes);
+            };
+            peer2.OnClosed += (id) =>
+            {
+            };
+            peer2.OnLinkError += (id, err) =>
+            {
+            };
+            peer2.OnRecv += (id, msg) =>
+            {
+                Console.WriteLine("peer2::OnRecv");
+
+                //peer1.CloseLink(peer1linkid);
+
+            };
+            for (var i = 0; i < 10*1000; i++)
+            {
+                var linkid = peer2.Connect(new System.Net.IPEndPoint(linkip, 8888));
+
+            }
         }
     }
 

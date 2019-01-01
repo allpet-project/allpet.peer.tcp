@@ -45,7 +45,7 @@ namespace light.asynctcp
 
                         //s.Send(Encoding.UTF8.GetBytes("Your GUID:" + token.ID));
 
-                        Console.WriteLine("client in:" + this.links.Count);
+                        //Console.WriteLine("client in:" + this.links.Count);
 
                         this.OnAccepted(link.Handle, link.Socket.RemoteEndPoint as System.Net.IPEndPoint);
 

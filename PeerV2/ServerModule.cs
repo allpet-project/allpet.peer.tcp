@@ -132,9 +132,9 @@ namespace light.asynctcp
             //_maxAcceptedClients.WaitOne();
 
             //不断执行检查是否有无效连接
-            var thread = new System.Threading.Thread(_DaemonThread);
-            thread.IsBackground = true;
-            thread.Start();
+            //var thread = new System.Threading.Thread(_DaemonThread);
+            //thread.IsBackground = true;
+            //thread.Start();
         }
         private void OnCompleted(object sender, SocketAsyncEventArgs e)
         {
@@ -177,24 +177,24 @@ namespace light.asynctcp
             }
             catch (Exception Err)
             {
-                Console.WriteLine("error:" + Err.Message);
+                Console.WriteLine("error:" + Err.Message +"|"+ Err.StackTrace);
             }
         }
 
-        void _DaemonThread()
-        {
-            while (true)
-            {
-                //加上超时检测代码
+        //void _DaemonThread()
+        //{
+        //    while (true)
+        //    {
+        //        //加上超时检测代码
 
-                for (int i = 0; i < 60 * 1000 / 10; i++) //每分钟检测一次
-                {
-                    //if (!m_thread.IsAlive)
-                    //    break;
-                    Thread.Sleep(10);
-                }
-            }
-        }
+        //        for (int i = 0; i < 60 * 1000 / 10; i++) //每分钟检测一次
+        //        {
+        //            //if (!m_thread.IsAlive)
+        //            //    break;
+        //            Thread.Sleep(10);
+        //        }
+        //    }
+        //}
 
         public UInt64 Connect(IPEndPoint linktoEndPoint)
         {
@@ -222,12 +222,14 @@ namespace light.asynctcp
             link.Handle = (UInt64)link.Socket.Handle;
             link.sendTag = 0;
             link.ConnectDateTime = DateTime.Now;
+            this.links[link.Handle] = link;
+
             eventArgs.RemoteEndPoint = linktoEndPoint;
             if (!link.Socket.ConnectAsync(eventArgs))
             {
                 ProcessConnect(eventArgs, link);
             }
-            this.links[link.Handle] = link;
+
             return link.Handle;
         }
 
