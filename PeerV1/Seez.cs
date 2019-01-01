@@ -14,6 +14,8 @@ namespace allpet.peer.tcp
             get;
             private set;
         }
+        public string Ver => "0.01";
+
         private Socket listener;
         public EndPoint listenEndpoint;
         //private Semaphore semaphoreAcceptedClients;

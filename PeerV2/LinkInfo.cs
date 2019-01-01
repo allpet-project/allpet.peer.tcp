@@ -13,6 +13,7 @@ namespace light.asynctcp
     }
     class LinkInfo
     {
+        public bool indisconnect;
         public LinkType type;
         public Socket Socket;
         public UInt64 Handle;

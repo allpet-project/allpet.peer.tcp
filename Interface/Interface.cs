@@ -6,6 +6,9 @@ namespace allpet.peer.tcp
     public class PeerOption
     {
         public int maxSleepTimer = 10000;//默认10秒无响应的连接就自动断开
+        public int ReadBufSize = 1024 * 16;
+        public int WriteBufSize = 1024 * 16;
+        public int ListenLinkBufSize = 100;
     }
 
     /// <summary>
@@ -15,6 +18,10 @@ namespace allpet.peer.tcp
     // 继承IDisposable 明确表示此类型含有非托管资源，需妥善释放
     {
         UInt64 ID
+        {
+            get;
+        }
+        string Ver
         {
             get;
         }

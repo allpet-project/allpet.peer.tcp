@@ -31,6 +31,8 @@ namespace light.asynctcp
     {
 
         public static UInt64 moduleID = 0;
+        public string Ver => "PeerV2 0.1";
+
         /// <summary>  
         /// 监听Socket，用于接受客户端的连接请求  
         /// </summary>  
@@ -60,7 +62,7 @@ namespace light.asynctcp
             logger.Log("Module Start==");
 
             int capacity = 1000;
-            InitPools(capacity);
+            InitPools(option);
             InitProcess();
 
             logger.Log("==Module Start");
@@ -140,10 +142,12 @@ namespace light.asynctcp
         {
             try
             {
+
                 //logger.Log("got complete state:" + e.LastOperation + "|" + e.SocketError);
 
                 switch (e.LastOperation)
                 {
+
                     case SocketAsyncOperation.Accept:
                         ProcessAccept(e);
                         break;
@@ -151,22 +155,30 @@ namespace light.asynctcp
                         ProcessConnect(e, e.UserToken as LinkInfo);
                         break;
                     case SocketAsyncOperation.Disconnect:
-                        ProcessDisConnect(e, e.UserToken as LinkInfo);
+                        //lock (e.UserToken)
+                        {
+                            ProcessDisConnect(e, e.UserToken as LinkInfo);
+                        }
                         break;
                     case SocketAsyncOperation.Receive:
                         {
-                            if (e.SocketError != SocketError.Success)
+                            //lock(e.UserToken)
                             {
-                                throw new Exception("what the fuck.");
-                            }
-                            else
-                            {
-                                bool bEnd = false;
-                                while (!bEnd)
+                                if (e.SocketError != SocketError.Success)
                                 {
-                                    bEnd = ProcessReceice(e, e.UserToken as LinkInfo);
+                                    OnLinkError((e.UserToken as LinkInfo).Handle, new Exception(e.SocketError.ToString()));
+                                    //throw new Exception("receive error.");
+                                    ProcessRecvZero(e.UserToken as LinkInfo);
                                 }
-                                //ProcessReceice(e, e.UserToken as LinkInfo);
+                                else
+                                {
+                                    bool bEnd = false;
+                                    while (!bEnd)
+                                    {
+                                        bEnd = ProcessReceice(e, e.UserToken as LinkInfo);
+                                    }
+
+                                }//ProcessReceice(e, e.UserToken as LinkInfo);
                             }
                         }
                         break;
@@ -177,7 +189,7 @@ namespace light.asynctcp
             }
             catch (Exception Err)
             {
-                Console.WriteLine("error:" + Err.Message +"|"+ Err.StackTrace);
+                Console.WriteLine("error:" + Err.Message + "|" + Err.StackTrace);
             }
         }
 
@@ -260,21 +272,22 @@ namespace light.asynctcp
         public void Disconnect(ulong linkid)
         {
             var link = this.links[linkid];
+            link.indisconnect = true;
             try
             {
+                link.Socket.Shutdown(SocketShutdown.Both);
+
                 var e = GetFreeEventArgs();
                 e.UserToken = link;
                 var b = link.Socket.DisconnectAsync(e);
-                //if (!b)
-                //{
-                //    ProcessDisConnect(e, link);
-                //}
-                link.Socket.Shutdown(SocketShutdown.Both);
+                if (!b)
+                {
+                    ProcessDisConnect(e, link);
+                }
             }
             catch (Exception ex)
             {
-                // Throw if client has closed, so it is not necessary to catch.
-                //Log4Debug(ex.StackTrace);
+                Console.WriteLine("Disconnect error:" + ex.Message + "|" + ex.StackTrace);
             }
             finally
             {

@@ -22,60 +22,75 @@ namespace light.asynctcp
         /// <param name="e">SocketAsyncEventArg associated with the completed accept operation.</param>  
         private void ProcessAccept(SocketAsyncEventArgs e)
         {
-            if (e.SocketError == SocketError.Success)
+            lock (this)
             {
-                Socket s = e.AcceptSocket;//和客户端关联的socket  
-                if (s != null && s.Connected)
+                if (e.SocketError == SocketError.Success)
                 {
-                    try
+                    Socket s = e.AcceptSocket;//和客户端关联的socket  
+                    if (s != null && s.Connected)
                     {
-
-                        SocketAsyncEventArgs asyniar = GetFreeEventArgs();
-                        var link = GetFreeLink();
-                        link.type = LinkType.AcceptedLink;
-                        asyniar.UserToken = link;
-
-                        //用户的token操作
-                        link.Socket = s;
-                        link.Handle = (UInt64)s.Handle.ToInt64();
-                        //token.ID = System.Guid.NewGuid().ToString();
-                        link.ConnectDateTime = DateTime.Now;
-                        link.sendTag = 0;
-                        this.links.TryAdd((UInt64)link.Handle, link);
-
-                        //s.Send(Encoding.UTF8.GetBytes("Your GUID:" + token.ID));
-
-                        //Console.WriteLine("client in:" + this.links.Count);
-
-                        this.OnAccepted(link.Handle, link.Socket.RemoteEndPoint as System.Net.IPEndPoint);
-
-                        var asyncr = link.Socket.ReceiveAsync(link.recvArgs);
-                        if (!asyncr)
+                        try
                         {
-                            if (!asyncr)
+
+                            SocketAsyncEventArgs asyniar = GetFreeEventArgs();
+                            var link = GetFreeLink();
+                            link.type = LinkType.AcceptedLink;
+                            asyniar.UserToken = link;
+
+                            //用户的token操作
+                            link.Socket = s;
+                            link.Handle = (UInt64)s.Handle.ToInt64();
+                            //token.ID = System.Guid.NewGuid().ToString();
+                            link.ConnectDateTime = DateTime.Now;
+                            link.sendTag = 0;
+                            this.links[link.Handle] = link;
+
+                            //s.Send(Encoding.UTF8.GetBytes("Your GUID:" + token.ID));
+
+                            //Console.WriteLine("client in:" + this.links.Count);
+                            //lock (link)
                             {
-                                bool bEnd = false;
-                                while (!bEnd)
+                                this.OnAccepted(link.Handle, link.Socket.RemoteEndPoint as System.Net.IPEndPoint);
+                                //try
                                 {
-                                    bEnd = ProcessReceice(link.recvArgs, link);
+                                    if (link.indisconnect == false)
+                                    {
+                                        var asyncr = link.Socket.ReceiveAsync(link.recvArgs);
+                                        if (!asyncr)
+                                        {
+                                            if (!asyncr)
+                                            {
+                                                bool bEnd = false;
+                                                while (!bEnd)
+                                                {
+                                                    if (link.indisconnect == false)
+                                                        bEnd = ProcessReceice(link.recvArgs, link);
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
+                                //catch
+                                //{
+                                //    //如果這裏出問題就不管了
+                                //}
                             }
                         }
-                    }
-                    catch (SocketException ex)
-                    {
+                        catch (SocketException ex)
+                        {
 
-                        Console.WriteLine(String.Format("接收客户 {0} 数据出错, 异常信息： {1} 。", s.RemoteEndPoint, ex.ToString()));
-                        //TODO 异常处理  
+                            Console.WriteLine(String.Format("接收客户 {0} 数据出错, 异常信息： {1} 。", s.RemoteEndPoint, ex.ToString()));
+                            //TODO 异常处理  
+                        }
+                        //投递下一个接受请求,這裏就直接復用了
+                        StartAccept(e);
                     }
-                    //投递下一个接受请求,這裏就直接復用了
-                    StartAccept(e);
                 }
-            }
-            else
-            {
-                throw new Exception("accept error.");
-                //ProcessDisConnect(e, e.UserToken as LinkInfo);
+                else
+                {
+                    throw new Exception("accept error.");
+                    //ProcessDisConnect(e, e.UserToken as LinkInfo);
+                }
             }
         }
 
@@ -189,8 +204,11 @@ namespace light.asynctcp
         {//收到这个是主动断线一方
             try
             {
-                link.Socket.Close();
-                link.Socket = null;
+                this.PushBackLinks(link);
+                this.links.TryRemove(link.Handle, out LinkInfo v);
+
+                this.OnClosed(link.Handle);
+
             }
             catch (Exception err)
             {
@@ -206,6 +224,8 @@ namespace light.asynctcp
         {
             this.PushBackLinks(link);
             this.links.TryRemove(link.Handle, out LinkInfo v);
+            link.Handle = 0;
+
 
             this.OnClosed(link.Handle);
         }

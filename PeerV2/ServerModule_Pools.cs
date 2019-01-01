@@ -7,10 +7,12 @@ namespace light.asynctcp
 {
     partial class ServerModule
     {
-        void InitPools(int capacity = 1000)
+        void InitPools(allpet.peer.tcp.PeerOption option)
         {
+            _ReadBufferSize = option.ReadBufSize;
+            _SendBufferSize = option.WriteBufSize;
             poolEventArgs = new System.Collections.Concurrent.ConcurrentStack<SocketAsyncEventArgs>();
-            for (var i = 0; i < capacity; i++)
+            for (var i = 0; i < option.ListenLinkBufSize*2; i++)
             {
                 var args = new SocketAsyncEventArgs();
                 args.Completed += OnCompleted;
@@ -18,7 +20,7 @@ namespace light.asynctcp
             }
 
             poolLinks = new System.Collections.Concurrent.ConcurrentStack<LinkInfo>();
-            for (var i = 0; i < capacity; i++)
+            for (var i = 0; i < option.ListenLinkBufSize; i++)
             {
                 poolLinks.Push(GetFreeLink());
             }
@@ -52,12 +54,16 @@ namespace light.asynctcp
         System.Collections.Concurrent.ConcurrentStack<LinkInfo> poolLinks;
         void PushBackLinks(LinkInfo link)
         {
+            link.Socket.Close();
+            link.Socket = null;
+            link.Handle = 0;
+
             poolLinks.Push(link);
         }
 
         //16k 大缓存区， 100个链接占用3M多缓存区，还好
-        const int _ReadBufferSize = 1024 * 16;
-        const int _SendBufferSize = 1024 * 16;
+         int _ReadBufferSize ;
+         int _SendBufferSize;
 
         LinkInfo GetFreeLink()
         {
@@ -75,9 +81,11 @@ namespace light.asynctcp
                     link.sendArgs = GetFreeEventArgs();
                     link.sendArgs.SetBuffer(new byte[_SendBufferSize], 0, _SendBufferSize);
                 }
-                link.recvArgs.UserToken = link;
-                link.sendArgs.UserToken = link;
             }
+            link.recvArgs.UserToken = link;
+            link.sendArgs.UserToken = link;
+
+            link.indisconnect = false;
             return link;
         }
 
