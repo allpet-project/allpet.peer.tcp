@@ -161,7 +161,12 @@ namespace light.asynctcp
                             }
                             else
                             {
-                                ProcessReceice(e, e.UserToken as LinkInfo);
+                                bool bEnd = false;
+                                while (!bEnd)
+                                {
+                                    bEnd = ProcessReceice(e, e.UserToken as LinkInfo);
+                                }
+                                //ProcessReceice(e, e.UserToken as LinkInfo);
                             }
                         }
                         break;
@@ -215,6 +220,7 @@ namespace light.asynctcp
             link.type = LinkType.ConnectedLink;
             link.Socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             link.Handle = (UInt64)link.Socket.Handle;
+            link.sendTag = 0;
             eventArgs.RemoteEndPoint = linktoEndPoint;
             if (!link.Socket.ConnectAsync(eventArgs))
             {
@@ -226,15 +232,10 @@ namespace light.asynctcp
 
         public void Send(ulong linkid, byte[] data)
         {
+
             var link = this.links[linkid];
-            link.sendArgs.SendPacketsSendSize = data.Length;
-            link.sendArgs.SendPacketsFlags = TransmitFileOptions.UseSystemThread;
-            link.sendArgs.SetBuffer(data, 0, data.Length);
-            bool basync = link.Socket.SendAsync(link.sendArgs);
-            if (!basync)
-            {
-                ProcessSend(link.sendArgs, link);
-            }
+            Send(link, data);
+
         }
 
         public void Disconnect(ulong linkid)

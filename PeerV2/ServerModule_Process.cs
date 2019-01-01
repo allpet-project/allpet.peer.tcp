@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Net.Sockets;
+using System.Threading;
 
 namespace light.asynctcp
 {
@@ -43,6 +44,7 @@ namespace light.asynctcp
                         link.sendArgs = GetFreeEventArgs();
                         link.recvArgs.UserToken = link;
                         link.sendArgs.UserToken = link;
+                        link.sendTag = 0;
                         this.links.TryAdd((UInt64)link.Handle, link);
 
                         //s.Send(Encoding.UTF8.GetBytes("Your GUID:" + token.ID));
@@ -55,7 +57,14 @@ namespace light.asynctcp
                         var asyncr = link.Socket.ReceiveAsync(link.recvArgs);
                         if (!asyncr)
                         {
-                            ProcessReceice(link.recvArgs, link);
+                            if (!asyncr)
+                            {
+                                bool bEnd = false;
+                                while (!bEnd)
+                                {
+                                    bEnd = ProcessReceice(link.recvArgs, link);
+                                }
+                            }
                         }
                     }
                     catch (SocketException ex)
@@ -88,21 +97,25 @@ namespace light.asynctcp
             var asyncr = link.Socket.ReceiveAsync(link.recvArgs);
             if (!asyncr)
             {
-                ProcessReceice(link.recvArgs, link);
+                bool bEnd = false;
+                while (!bEnd)
+                {
+                    bEnd = ProcessReceice(link.recvArgs, link);
+                }
             }
 
             //復用一個connect args
             e.UserToken = null;
             this.PushBackEventArgs(e);
         }
-        private unsafe void ProcessReceice(SocketAsyncEventArgs e, LinkInfo link)
+        private unsafe bool ProcessReceice(SocketAsyncEventArgs e, LinkInfo link)
         {
             var pi = e.ReceiveMessageFromPacketInfo;
             if (e.BytesTransferred == 0)
             {
                 //接收0转过去的,这个e不给他回收
                 ProcessRecvZero(link);
-                return;
+                return true;
             }
             byte[] data = new byte[e.BytesTransferred];
 
@@ -116,14 +129,44 @@ namespace light.asynctcp
             this.OnRecv(link.Handle, data);
 
             var asyncr = link.Socket.ReceiveAsync(link.recvArgs);
-            if (!asyncr)
-            {
-                ProcessReceice(e, link);
-            }
+            return asyncr;
+        }
 
+        private void Send(LinkInfo link, byte[] data)
+        {
+            bool basync = false;
+            lock (link)
+            {
+                if (link.sendTag == 1)
+                {
+                    if (link.queueSend == null)
+                        link.queueSend = new System.Collections.Generic.Queue<ArraySegment<byte>>();
+                    link.queueSend.Enqueue(new ArraySegment<byte>(data));
+                    return;
+                }
+                link.sendArgs.SendPacketsSendSize = data.Length;
+                link.sendArgs.SendPacketsFlags = TransmitFileOptions.UseSystemThread;
+                link.sendArgs.SetBuffer(data, 0, data.Length);
+                basync = link.Socket.SendAsync(link.sendArgs);
+                if (basync)//操作没有立即完成，标记
+                    link.sendTag = 1;
+            }
+            if (!basync)
+            {
+                ProcessSend(link.sendArgs, link);
+            }
         }
         private void ProcessSend(SocketAsyncEventArgs e, LinkInfo link)
         {
+            lock (link)
+            {
+                link.sendTag = 0;
+                if (link.queueSend != null && link.queueSend.Count > 0)
+                {
+                    var data = link.queueSend.Dequeue();
+                    Send(link, data.Array);
+                }
+            }
 
         }
         private void ProcessDisConnect(SocketAsyncEventArgs e, LinkInfo link)
@@ -133,7 +176,7 @@ namespace light.asynctcp
                 link.Socket.Close();
                 link.Socket = null;
             }
-            catch(Exception err)
+            catch (Exception err)
             {
 
             }

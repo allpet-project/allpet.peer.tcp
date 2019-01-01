@@ -20,5 +20,8 @@ namespace light.asynctcp
         public DateTime ConnectDateTime;
         public SocketAsyncEventArgs recvArgs;
         public SocketAsyncEventArgs sendArgs;
+
+        public int sendTag;//此标记为1则有数据在发送中
+        public Queue<ArraySegment<byte>> queueSend;
     }
 }

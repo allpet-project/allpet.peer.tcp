@@ -58,6 +58,7 @@ namespace peer.test
         }
         static void Listen()
         {
+            DateTime time = DateTime.Now;
             var endpoint = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 8888);
             ulong peer2linkid = 0;
             ulong peer1linkid = 0;
@@ -74,11 +75,21 @@ namespace peer.test
             {
                 Console.WriteLine("peer1::OnLinkError");
             };
+            ulong recvsize = 0;
             peer1.OnRecv += (id, msg) =>
              {
-                 Console.WriteLine("peer1::OnRecv");
+                 recvsize += (ulong)msg.Length;
+                 if (recvsize % (1024 * 1024) == 0)
+                 {
+                     Console.WriteLine("peer1::OnRecv " + recvsize);
+                 }
                  //peer1.Send(id, new byte[] { 05, 00, 3, 1, 2, 3, 4 });
-                 peer1.Disconnect(id);
+                 //peer1.Disconnect(id);
+                 if(recvsize/(1024*1024)==100)
+                 {
+                     var total = (DateTime.Now - time).TotalSeconds;
+                     Console.WriteLine("total time=" + total);
+                 }
              };
             peer1.Listen(endpoint);
 
@@ -90,7 +101,11 @@ namespace peer.test
             {
                 Console.WriteLine("peer2::OnConnected");
 
-                peer2.Send(id, new byte[] { 05, 00, 1, 1, 2, 3, 4 });
+                for (var i = 0; i < 10* 1024; i++)
+                {
+                    var bytes = new byte[10* 1024];
+                    peer2.Send(id, bytes);
+                }
 
             };
             peer2.OnClosed += (id) =>
