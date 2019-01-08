@@ -43,6 +43,8 @@ namespace light.asynctcp
                             //token.ID = System.Guid.NewGuid().ToString();
                             link.ConnectDateTime = DateTime.Now;
                             link.sendTag = 0;
+                            link.lastPackageSize = 0;
+                            link.lastPackege = null;
                             this.links[link.Handle] = link;
 
                             //s.Send(Encoding.UTF8.GetBytes("Your GUID:" + token.ID));
@@ -121,14 +123,45 @@ namespace light.asynctcp
                 ProcessRecvZero(link);
                 return true;
             }
-            byte[] data = new byte[e.BytesTransferred];
-
-            fixed (byte* src = e.Buffer, dest = data)
+            if (option.SplitPackage64K == false)
             {
-                System.Buffer.MemoryCopy(src, dest, e.BytesTransferred, e.BytesTransferred);
+                byte[] data = new byte[e.BytesTransferred];
+                fixed (byte* src = e.Buffer, dest = data)
+                {
+                    System.Buffer.MemoryCopy(src + e.Offset, dest, e.BytesTransferred, e.BytesTransferred);
+                }
+                this.OnRecv(link.Handle, data);
             }
-            this.OnRecv(link.Handle, data);
-
+            else
+            {
+                var seek = 0;
+                while (seek < e.BytesTransferred)
+                {
+                    if (link.lastPackageSize == 0 && e.BytesTransferred >= 2)//fill len
+                    {
+                        link.lastPackageSize = BitConverter.ToUInt16(e.Buffer, e.Offset + seek);
+                        link.lastPackege = new byte[link.lastPackageSize - 2];
+                        link.lastPackegeSeek = 0;
+                        seek += 2;
+                    }
+                    if (seek < e.BytesTransferred)//fill package
+                    {
+                        var len = Math.Min(link.lastPackageSize - 2 - link.lastPackegeSeek, e.BytesTransferred - seek);
+                        fixed (byte* src = e.Buffer, dest = link.lastPackege)
+                        {
+                            System.Buffer.MemoryCopy(src + e.Offset + seek, dest + link.lastPackegeSeek, e.BytesTransferred, len);
+                        }
+                        link.lastPackegeSeek += (ushort)len;
+                        seek += len;
+                    }
+                    if (link.lastPackegeSeek == link.lastPackageSize - 2)//finish package
+                    {
+                        link.lastPackageSize = 0;
+                        link.lastPackegeSeek = 0;
+                        this.OnRecv(link.Handle, link.lastPackege);
+                    }
+                }
+            }
             var asyncr = link.Socket.ReceiveAsync(link.recvArgs);
             return asyncr;
         }

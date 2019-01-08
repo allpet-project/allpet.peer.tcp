@@ -7,7 +7,7 @@ namespace light.asynctcp
 {
     partial class ServerModule
     {
-        void InitPools(allpet.peer.tcp.PeerOption option)
+        void InitPools()
         {
             _ReadBufferSize = option.ReadBufSize;
             _SendBufferSize = option.WriteBufSize;

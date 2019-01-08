@@ -55,14 +55,14 @@ namespace light.asynctcp
         {
             this.ID = moduleID++;
         }
+        allpet.peer.tcp.PeerOption option;
         public void Start(allpet.peer.tcp.PeerOption option)
         {
             logger = new ConsoleLogger();
 
             logger.Log("Module Start==");
-
-            int capacity = 1000;
-            InitPools(option);
+            this.option = option;
+            InitPools();
             InitProcess();
 
             logger.Log("==Module Start");
@@ -233,6 +233,8 @@ namespace light.asynctcp
             link.Socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             link.Handle = (UInt64)link.Socket.Handle;
             link.sendTag = 0;
+            link.lastPackageSize = 0;
+            link.lastPackege = null;
             link.ConnectDateTime = DateTime.Now;
             this.links[link.Handle] = link;
 
@@ -248,6 +250,13 @@ namespace light.asynctcp
         public void Send(ulong linkid, byte[] data)
         {
             var link = this.links[linkid];
+            if(option.SplitPackage64K)
+            {
+                if (data.Length >= 65534)
+                    throw new Exception("too long for packet mode.");
+                var lendata = BitConverter.GetBytes((UInt16)(data.Length + 2));
+                SendOnce(link, new ArraySegment<byte>(lendata));
+            }
             var oncecount = _SendBufferSize;
 
             var last = data.Length % oncecount;
@@ -259,15 +268,7 @@ namespace light.asynctcp
             if (last != 0)
                 SendOnce(link, new ArraySegment<byte>(data, splitcount * oncecount, last));
         }
-        public void SendPacket(ulong linkid, byte[] data)
-        {
-            if (data.Length > 0xffff)
-            {
-                throw new Exception(" do not allow msg packet big than 0xffff.");
-            }
-            Send(linkid, BitConverter.GetBytes((UInt16)data.Length));
-            Send(linkid, data);
-        }
+
 
         public void Disconnect(ulong linkid)
         {
