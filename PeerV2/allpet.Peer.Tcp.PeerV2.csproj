@@ -8,7 +8,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DefineConstants>TRACE</DefineConstants>
-    <OutputPath>../bin</OutputPath>
+    <OutputPath>../../allpet.bin</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
