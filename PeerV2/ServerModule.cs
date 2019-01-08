@@ -250,7 +250,7 @@ namespace light.asynctcp
         public void Send(ulong linkid, byte[] data)
         {
             var link = this.links[linkid];
-            if(option.SplitPackage64K)
+            if(option.WithPackage64K)
             {
                 if (data.Length >= 65534)
                     throw new Exception("too long for packet mode.");

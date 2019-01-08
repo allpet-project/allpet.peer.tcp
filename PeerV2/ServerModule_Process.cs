@@ -123,7 +123,7 @@ namespace light.asynctcp
                 ProcessRecvZero(link);
                 return true;
             }
-            if (option.SplitPackage64K == false)
+            if (option.WithPackage64K == false)
             {
                 byte[] data = new byte[e.BytesTransferred];
                 fixed (byte* src = e.Buffer, dest = data)

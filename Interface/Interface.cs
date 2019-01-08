@@ -9,7 +9,7 @@ namespace allpet.peer.tcp
         public int ReadBufSize = 1024 * 16;
         public int WriteBufSize = 1024 * 16;
         public int ListenLinkBufSize = 100;
-        public bool SplitPackage64K = true;
+        public bool WithPackage64K = true;
     }
 
     /// <summary>
